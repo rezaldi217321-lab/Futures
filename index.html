@@ -1,0 +1,154 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>FUTURES ROBOT AI</title>
+<style>
+:root{--bg:#0a0e0a;--cd:#101810;--tx:#c8f5d0;--mu:#7a9a80;--g:#3dff7a;--r:#ff4d5e;--y:#ffd24a;--bd:#1f3a26;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f2f7f2;--cd:#fff;--tx:#12301a;--mu:#52705a;--g:#0a8a3a;--r:#c4202f;--y:#a87500;--bd:#c5d8c9}}
+:root[data-theme="dark"]{--bg:#0a0e0a;--cd:#101810;--tx:#c8f5d0;--mu:#7a9a80;--g:#3dff7a;--r:#ff4d5e;--y:#ffd24a;--bd:#1f3a26}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+main{max-width:980px;margin:0 auto;padding:12px}
+h1{font-size:18px;margin:4px 0;color:var(--g)}h2{font-size:14px;margin:0 0 6px;color:var(--g)}
+.cd{background:var(--cd);border:1px solid var(--bd);border-radius:8px;padding:10px;margin:10px 0}
+.g{color:var(--g)}.r{color:var(--r)}.y{color:var(--y)}.m{color:var(--mu)}
+.tw{overflow-x:auto;max-height:340px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;min-width:520px}th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}tr.s{background:var(--bd)}tbody tr{cursor:pointer}
+.row{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--bd);padding:2px 0}
+.big{font-size:22px;font-weight:700;text-align:center;padding:8px}
+details{border-bottom:1px solid var(--bd);padding:4px 0}summary{cursor:pointer}
+.pl{color:var(--mu);font-size:11px;word-break:break-word}
+</style></head><body><main>
+<h1>⚡ FUTURES ROBOT AI</h1>
+<div class="m">Total Symbol: <b id="tot" class="g"></b> · Data: <b id="st" class="y">memuat…</b></div>
+<div class="pl">DATA LANGSUNG → CAP WAKTU → KUALITAS DATA → AGEN 11–15 → KONSENSUS → KONFLIK → VALIDASI → GATE → BELI/JUAL/TUNGGU</div>
+<div class="cd"><div class="tw"><table><thead><tr><th>Symbol</th><th>Harga</th><th>24j %</th><th>Volume (USDT)</th><th>OI (USD)</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+<div class="cd"><div id="tv" style="height:420px"></div></div>
+<div id="out" class="m">Pilih symbol untuk menjalankan Validation Chain.</div>
+<p class="m" style="font-size:11px">Bukan nasihat keuangan. Historical edge ≠ profit di masa depan. BUY = evidence lolos gate, bukan harga pasti naik.</p>
+</main>
+<script>
+const B="https://www.okx.com/api/v5/";
+const SYMS="BTC,ETH,SOL,BNB,XRP,DOGE,TRX,SUI,TON,SHIB,PEPE,NEAR,APT,ARB,OP,UNI,FIL,XLM,ICP,DASH,XMR,VET,IOST,WLD,XAU,XAG,XPD,INTC,NVDA,QQQ,ORDI,ZEC,XTZ,ZEN,RVN,LINK,DOT,TRUMP".split(",").map(s=>s+"USDT");
+let T={},F={},sel=null;const $=id=>document.getElementById(id);
+const j=async u=>{const r=await fetch(u);if(!r.ok)throw 0;return r.json()};
+const nm=s=>{const k=s.replace("USDT","")+"-USDT-SWAP";return T[k]?k:null};
+const fm=(n,d=2)=>isFinite(n)?(+n).toLocaleString("en-US",{maximumFractionDigits:d}):"–";
+const P1=(n)=>isFinite(n)?(n*100).toFixed(1)+"%":"–";
+const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0,sd=a=>{const m=mean(a);return Math.sqrt(mean(a.map(x=>(x-m)**2)))};
+const med=a=>{a=[...a].sort((x,y)=>x-y);return a.length?a[Math.floor(a.length/2)]:0},pc=(a,p)=>{a=[...a].sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(p*a.length))]};
+const ema=(a,n)=>{const k=2/(n+1),o=[a[0]];for(let i=1;i<a.length;i++)o[i]=a[i]*k+o[i-1]*(1-k);return o};
+const rsi=(a,n=14)=>{const o=Array(a.length).fill(50);let g=0,l=0;for(let i=1;i<a.length;i++){const d=a[i]-a[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n;o[i]=l?100-100/(1+g/l):100}return o};
+const cl=(x,a=0,b=100)=>Math.max(a,Math.min(b,x));
+async function load(){
+ try{const t=await j(B+"market/tickers?instType=SWAP");T={};t.data.forEach(x=>{const l=+x.last;T[x.instId]={lastPrice:l,priceChangePercent:(l/+x.open24h-1)*100,quoteVolume:+x.volCcy24h*l,highPrice:+x.high24h,lowPrice:+x.low24h}});const p=await j(B+"public/open-interest?instType=SWAP");F={};p.data.forEach(x=>F[x.instId]={oiUsd:+x.oiUsd,lastFundingRate:0});$("st").textContent="LIVE OKX "+new Date().toLocaleTimeString("id-ID");$("st").className="g"}
+ catch(e){T={};F={};$("st").textContent="DATA UNAVAILABLE (OKX tidak terjangkau)";$("st").className="r"}
+ render()}
+function render(){$("tot").textContent=SYMS.length;
+ $("tb").innerHTML=SYMS.map(s=>{const k=nm(s),x=k&&T[k],f=k&&F[k];const c=x?+x.priceChangePercent:NaN;
+ return `<tr class="${s===sel?"s":""}" onclick="analyze('${s}')"><td>${s}</td><td>${x?fm(x.lastPrice,6):"N/A"}</td><td class="${c>=0?"g":"r"}">${x?c.toFixed(2)+"%":"–"}</td><td>${x?fm(x.quoteVolume,0):"–"}</td><td>${f?fm(f.oiUsd,0):"–"}</td></tr>`}).join("")}
+function tv(k){const d=$("tv");if(!d)return;d.innerHTML="";const mk=()=>new TradingView.widget({container_id:"tv",symbol:"OKX:"+k+".P",interval:"60",theme:matchMedia("(prefers-color-scheme: light)").matches?"light":"dark",autosize:true,locale:"id",timezone:"Asia/Jakarta",style:"1",allow_symbol_change:true,studies:["MASimple@tv-basicstudies"]});
+ if(window.TradingView)mk();else{const s=document.createElement("script");s.src="https://s3.tradingview.com/tv.js";s.onload=mk;s.onerror=()=>{d.textContent="Chart TradingView tidak bisa dimuat di sini"};document.head.appendChild(s)}}
+async function candles(k){let o=[],af="";for(let i=0;i<5;i++){const r=await j(B+`market/candles?instId=${k}&bar=1H&limit=300`+(af?`&after=${af}`:""));if(!r.data||!r.data.length)break;o=o.concat(r.data);af=r.data[r.data.length-1][0]}
+ return o.reverse().filter(x=>x[8]==="1").map(x=>[x[0],x[1],x[2],x[3],x[4],x[5],+x[0]+36e5])}
+async function analyze(s){sel=s;render();const k=nm(s),o=$("out");if(k)tv(s);
+ if(!k){o.innerHTML=`<div class="cd"><h2>${s}</h2><b class="r">DATA UNAVAILABLE</b> — simbol tidak ditemukan di OKX Swap (atau data tidak terjangkau).</div>`;return}
+ o.textContent="Menjalankan validation chain…";
+ try{const kl=await candles(k);const fr=await j(B+`public/funding-rate?instId=${k}`).catch(()=>null);F[k]=F[k]||{};if(fr&&fr.data&&fr.data[0])F[k].lastFundingRate=+fr.data[0].fundingRate;const oi={openInterest:F[k].oiUsd};
+  o.innerHTML=view(s,k,kl,oi)}catch(e){o.innerHTML=`<div class="cd"><b class="r">DATA UNAVAILABLE</b> — ${e&&e.message?e.message:"gagal mengambil data"}</div>`}}
+function mk(c){const ca={},E=n=>ca[n]||(ca[n]=ema(c,n));E.r=rsi(c);return E}
+function run(c,P,fee,slip,a,b,E){const ef=E(P.f),es=E(P.s),r=E.r,k=fee+slip;let pos=0,eq=1,pk=1,mdd=0,tr=[],cur=0,rs=[],ix=[];
+ for(let i=Math.max(a,P.s);i<b-1;i++){const sg=ef[i]>es[i]&&r[i]>50?1:ef[i]<es[i]&&r[i]<50?-1:0;let x=0;
+  if(sg!==pos){if(pos){cur-=k;tr.push(cur);cur=0;x-=k}if(sg){cur-=k;x-=k}pos=sg}
+  if(pos){const q=pos*(c[i+1]/c[i]-1);x+=q;cur+=q}
+  eq*=1+x;pk=Math.max(pk,eq);mdd=Math.min(mdd,eq/pk-1);rs.push(x);ix.push(i+1)}
+ if(pos)tr.push(cur);
+ const w=tr.filter(x=>x>0),gl=Math.abs(tr.filter(x=>x<=0).reduce((x,y)=>x+y,0));
+ return{ret:eq-1,mdd,tr,rs,ix,n:tr.length,wr:tr.length?w.length/tr.length:0,pf:gl?w.reduce((x,y)=>x+y,0)/gl:(w.length?9.99:0),exp:mean(tr),sh:sd(rs)?mean(rs)/sd(rs)*Math.sqrt(8760):0,bh:c[b-1]/c[Math.max(a,P.s)]-1,pb:mean(rs)}}
+const G=[];[8,12,20].forEach(f=>[30,50,80].forEach(s=>G.push({f,s})));
+function view(s,k,kl,oi){
+ if(kl.length&&kl[kl.length-1][6]>Date.now())kl.pop();
+ const c=kl.map(x=>+x[4]),N=c.length;if(N<500)throw new Error("histori terlalu pendek ("+N+" candle)");
+ const tcap=kl[N-1][6],age=(Date.now()-tcap)/6e4;
+ if(age>180)throw new Error("data basi (umur "+Math.round(age)+" menit) — cap waktu gagal");
+ const E=mk(c),fee=.0005,slip=.0003,opt=(a,b)=>G.map(p=>({p,r:run(c,p,fee,slip,a,b,E).ret})).sort((x,y)=>y.r-x.r)[0].p;
+ const sp=Math.floor(N*.7),P=opt(0,sp),IS=run(c,P,fee,slip,0,sp,E),OOS=run(c,P,fee,slip,sp,N,E),BT=run(c,P,fee,slip,0,N,E);
+ const W=[];for(let a=0;a+750<=N;a+=150){const Pw=opt(a,a+600);W.push(run(c,Pw,fee,slip,a+600,a+750,E))}
+ const wr=W.map(w=>w.ret),cons=wr.length?wr.filter(x=>x>0).length/wr.length:0;
+ const wfPass=W.length>=3&&med(wr)>0&&cons>=.5,btPass=BT.ret>0&&BT.pf>1&&BT.n>=20;
+ const oosOk=OOS.ret>0&&IS.ret>0&&OOS.n>=5&&OOS.pb>=.4*IS.pb;
+ let ov=0;if(BT.n<30)ov++;if(IS.ret>0&&OOS.ret<=0)ov+=2;if(IS.pb>0&&OOS.pb<.3*IS.pb)ov++;if(cons<.5)ov++;
+ const OV=["LOW","MEDIUM","HIGH","EXTREME"][Math.min(3,ov)];
+ // Monte Carlo (bootstrap)
+ let mc=null;if(BT.n>=5){const R=[],D=[];let loss=0,ruin=0;for(let q=0;q<10000;q++){let e=1,pk=1,dd=0,ru=false;for(let t=0;t<BT.n;t++){e*=1+BT.tr[Math.floor(Math.random()*BT.n)];pk=Math.max(pk,e);dd=Math.min(dd,e/pk-1);if(e<.5)ru=true}R.push(e-1);D.push(dd);if(e<1)loss++;if(ru)ruin++}
+  mc={p5:pc(R,.05),p25:pc(R,.25),m:pc(R,.5),p75:pc(R,.75),p95:pc(R,.95),loss:loss/1e4,ruin:ruin/1e4,dd:pc(D,.05)}}
+ // Robustness
+ const sc=[["Asli",BT.ret],["Fee +20%",run(c,P,fee*1.2,slip,0,N,E).ret],["Slippage +50%",run(c,P,fee,slip*1.5,0,N,E).ret],
+  ["Param f-",run(c,{f:P.f===8?12:8,s:P.s},fee,slip,0,N,E).ret],["Param s+",run(c,{f:P.f,s:P.s===80?50:80},fee,slip,0,N,E).ret]];
+ const pos=sc.filter(x=>x[1]>0).length/sc.length,worst=Math.min(...sc.map(x=>x[1]));
+ const rb=Math.round(BT.ret>0?pos*70+30*cl(worst/BT.ret,0,1):pos*60),RBL=rb>=80?"ROBUST":rb>=60?"MODERATE":rb>=40?"WEAK":"FRAGILE";
+ // Regimes
+ const e200=E(200),rg={BULL:0,BEAR:0,SIDEWAYS:0,"HIGH VOL":0,"LOW VOL":0};const vol=c.map((x,i)=>i<24?0:sd(c.slice(i-24,i).map((y,z,a)=>z?y/a[z-1]-1:0)));const mv=med(vol.slice(24));
+ BT.ix.forEach((i,z)=>{const r=BT.rs[z];const t=c[i]>e200[i]*1.01?"BULL":c[i]<e200[i]*.99?"BEAR":"SIDEWAYS";rg[t]+=r;rg[vol[i]>mv?"HIGH VOL":"LOW VOL"]+=r});
+ const rp=["BULL","BEAR","SIDEWAYS"].filter(x=>rg[x]>0).length,rdep=rp<=1;
+ // Scores
+ const btS=BT.ret>0?Math.min(100,40+BT.pf*20):cl(30+BT.ret*100),wfS=cons*100*(med(wr)>0?1:.5),oosS=OOS.ret>0?(oosOk?90:55):15;
+ const mcS=mc?100*(1-mc.loss)*cl(1-mc.ruin*2,0,1):0,smS=Math.min(100,BT.n),rgS=rp/3*100;
+ const V=Math.round(.15*btS+.2*wfS+.2*oosS+.15*mcS+.15*rb+.1*smS+.05*rgS);
+ let ES=Math.round(.25*oosS+.15*wfS+.15*Math.min(100,BT.pf*45)+.1*cl(100+BT.mdd*250)+.15*rb+.1*mcS+.1*smS);if(ov>=2)ES=Math.min(ES,55);
+ const ESL=ES>=90?"VERY STRONG HISTORICAL EVIDENCE":ES>=75?"STRONG":ES>=60?"MODERATE":ES>=40?"WEAK":"NO PROVEN EDGE";
+ // Live data
+ const x=T[k]||{},f=F[k]||{},fu=+f.lastFundingRate||0,chg=+x.priceChangePercent||0,qv=+x.quoteVolume||0,last=c[N-1];
+ const i=N-1,sig=E(P.f)[i]>E(P.s)[i]&&E.r[i]>50?1:E(P.f)[i]<E(P.s)[i]&&E.r[i]<50?-1:0;
+ const rr=E.r[i],pr=x.highPrice?(last-x.lowPrice)/(x.highPrice-x.lowPrice):.5,atr=mean(c.slice(-14).map((v,z,a)=>z?Math.abs(v/a[z-1]-1):0))*100;
+ const btc=T["BTC-USDT-SWAP"]?+T["BTC-USDT-SWAP"].priceChangePercent:0,ts=new Date(tcap).toISOString();
+ const A=(n,w,d,cf,ev,inv,dq="SEDANG")=>({n,w,d,c:cf,ev,inv,dq});
+ const NA=(n,w,why)=>A(n,w,null,0,[why],"–","RENDAH");
+ const ag=[
+  A("Technical",15,sig,40+Math.abs(rr-50)*1.2,[`EMA${P.f}/EMA${P.s} 1j`,`RSI14 ${rr.toFixed(0)}`,`Harga ${fm(last,6)}`],"Cross EMA berbalik arah"),
+  A("Price Action",10,chg>1&&pr>.6?1:chg<-1&&pr<.4?-1:0,30+Math.abs(chg)*5,[`24j ${chg.toFixed(2)}%`,`Posisi range 24j ${(pr*100).toFixed(0)}%`],"Break range 24j"),
+  A("Cycle (±62 hari saja)",15,last>e200[i]?1:-1,30,[`Harga vs EMA200 1j ${last>e200[i]?"di atas":"di bawah"}`,"Histori siklus panjang tidak tersedia"],"Close menembus EMA200","RENDAH"),
+  NA("On-Chain",15,"DATA UNAVAILABLE"),NA("Macro",10,"DATA UNAVAILABLE"),
+  A("Liquidity",10,0,qv>5e8?80:qv>5e7?60:30,[`Volume 24j ${fm(qv/1e6,1)}M USDT`],"Volume turun tajam","TINGGI"),
+  NA("Historical Cycle",10,"Histori panjang tidak tersedia"),
+  A("Backtest",10,btPass?sig:0,btS,[`Ret ${P1(BT.ret)}`,`PF ${BT.pf.toFixed(2)}`,`${BT.n} trade`],"PF < 1","TINGGI"),
+  A("Walk-Forward",5,wfPass?sig:0,wfS,[`${W.length} window`,`Konsistensi ${P1(cons)}`],"Median OOS < 0","TINGGI"),
+  A("Out-of-Sample",5,oosOk?sig:0,oosS,[`IS ${P1(IS.ret)}`,`OOS ${P1(OOS.ret)}`],"OOS negatif","TINGGI"),
+  A("Monte Carlo",5,mc&&mc.loss<.35?sig:0,mcS,mc?[`P(loss) ${P1(mc.loss)}`,`Ruin ${P1(mc.ruin)}`]:["Trade < 5"],"P(loss) > 35%","TINGGI"),
+  A("Robustness",5,rb>=60?sig:0,rb,[`Skor ${rb}/100`],"Skor < 60","TINGGI"),
+  A("11 Refleksivitas",5,chg>3&&fu>5e-4?-1:chg<-3&&fu<-5e-4?1:0,cl(40+Math.abs(fu)*2e4,0,80),[`Funding ${(fu*100).toFixed(4)}%`,`Harga 24j ${chg.toFixed(1)}%`,"Sentimen vs harga: posisi padat = risiko umpan balik"],"Funding kembali normal"),
+  A("12 Risiko/Imbalan",5,Math.sign(last-c[N-25])===(E(P.f)[i]>E(P.s)[i]?1:-1)?sig:0,50,[`Momentum 24j ${P1(last/c[N-25]-1)}`,`ATR kasar ${atr.toFixed(2)}%/jam`,"Tren & momentum searah"],"Momentum & tren berlawanan"),
+  NA("13 Fundamental",5,"DATA FUNDAMENTAL: TERBATAS / TIDAK BERLAKU"),
+  A("14 Benchmark B&H",5,BT.ret>BT.bh?sig:0,50,[`Strategi ${P1(BT.ret)}`,`Buy&Hold ${P1(BT.bh)}`,"Biaya sudah termasuk"],"Strategi < Buy&Hold","TINGGI"),
+  A("15 Risiko Pasar Kripto",5,chg>0&&fu<3e-4?1:chg<0&&fu>-3e-4?-1:0,45,[`Vs BTC ${(chg-btc).toFixed(2)}%`,`Funding ${(fu*100).toFixed(4)}%`,`OI ${oi?fm(+oi.openInterest,0):"N/A"}`],"BTC berbalik tajam")];
+ const av=ag.filter(a=>a.d!==null),tw=av.reduce((a,b)=>a+b.w*b.c,0)||1;
+ const sh=d=>av.filter(a=>a.d===d).reduce((a,b)=>a+b.w*b.c,0)/tw,bu=sh(1),ne=sh(0),be=sh(-1);
+ const cons2=bu>.5&&bu-be>.2?"BULLISH":be>.5&&be-bu>.2?"BEARISH":"NETRAL";
+ const conf=bu>.25&&be>.25,sev=Math.min(bu,be)>.35;
+ const dq=av.length/ag.length>=.8?"HIGH":av.length/ag.length>=.6?"MEDIUM":"LOW";
+ const ok=V>=70&&oosOk&&ov<2&&rb>=60&&BT.n>=30&&!sev&&!(sig>0&&cons2==="BEARISH")&&!(sig<0&&cons2==="BULLISH")&&sig!==0;
+ const dec=ok?(sig>0?"BUY":"SELL"):"WAIT",why=[];
+ if(sig===0)why.push("Tidak ada sinyal arah dari strategi saat ini");if(V<70)why.push(`Validation ${V} < 70`);if(!oosOk)why.push("OOS belum terkonfirmasi");if(ov>=2)why.push(`Overfitting ${OV}`);if(rb<60)why.push(`Robustness ${rb} < 60`);if(BT.n<30)why.push(`LOW SAMPLE (${BT.n} trade)`);if(sev)why.push("Konflik konsensus ekstrem");
+ if(ok)why.push(`Semua syarat gate terpenuhi (V ${V}, robust ${rb}, OOS confirmed)`);
+ const cf=Math.round(Math.min(95,V*.6+(sig>0?bu:sig<0?be:0)*40));
+ const R=(a,b,c2)=>`<div class="row"><span class="m">${a}</span><b class="${c2||""}">${b}</b></div>`,st=(b,t,f2)=>b?`<span class="g">${t}</span>`:`<span class="r">${f2}</span>`;
+ const dn=d=>d===1?"BULLISH":d===-1?"BEARISH":"NETRAL";
+ return `<div class="cd"><h2>━ ⚡ VALIDATION CHAIN · ${s} ━</h2>
+ <div class="big ${dec==="BUY"?"g":dec==="SELL"?"r":"y"}">${dec==="BUY"?"🟢 BUY":dec==="SELL"?"🔴 SELL":"🟡 WAIT"}</div>
+ ${R("Confidence",cf+"%")}${R("Validation",V+"/100")}${R("Cap Waktu",ts+" ("+Math.round(age)+" mnt)")}${R("Data Quality",dq+" ("+av.length+"/"+ag.length+" agen tersedia)",dq==="LOW"?"r":"y")}
+ ${sig===0?"":R("Arah strategi",sig>0?"LONG":"SHORT")}${conf?`<p class="y">⚠️ SIGNAL CONFLICT — bullish ${P1(bu)} vs bearish ${P1(be)}${sev?" → dipaksa WAIT":""}</p>`:""}
+ <b>Reason:</b><ol>${why.slice(0,5).map(w=>`<li>${w}</li>`).join("")}</ol>
+ <b>INVALIDATION:</b> ${sig>0?"EMA cepat turun di bawah EMA lambat / RSI < 50":sig<0?"EMA cepat naik di atas EMA lambat / RSI > 50":"Muncul cross EMA + RSI searah"}</div>
+ <div class="cd"><h2>BACKTEST (1j, ${N} candle, fee 0.05% + slip 0.03%, param EMA ${P.f}/${P.s})</h2>
+ ${R("Return",P1(BT.ret))}${R("vs Buy & Hold",P1(BT.bh))}${R("Max Drawdown",P1(BT.mdd))}${R("Sharpe",BT.sh.toFixed(2))}${R("Profit Factor",BT.pf.toFixed(2))}${R("Win Rate",P1(BT.wr))}${R("Expectancy/trade",P1(BT.exp))}${R("Trades",BT.n)}
+ ${R("Status",btPass?"PASS":"FAIL",btPass?"g":"r")}${R("Edge",btPass&&oosOk&&wfPass?"PROVEN":"UNPROVEN")}</div>
+ <div class="cd"><h2>WALK-FORWARD</h2>${R("Windows",W.length)}${R("Avg / Median OOS",P1(mean(wr))+" / "+P1(med(wr)))}${R("Worst / Best",P1(Math.min(...wr))+" / "+P1(Math.max(...wr)))}${R("Consistency",P1(cons))}${R("Status",wfPass?"PASS":"FAIL",wfPass?"g":"r")}</div>
+ <div class="cd"><h2>OUT-OF-SAMPLE (70/30)</h2>${R("IN-SAMPLE",P1(IS.ret))}${R("OUT-OF-SAMPLE",P1(OOS.ret))}${R("OOS Sharpe / DD",OOS.sh.toFixed(2)+" / "+P1(OOS.mdd))}${R("Overfitting Risk",OV,ov>=2?"r":"g")}
+ <div>${oosOk?"✅ OUT-OF-SAMPLE CONFIRMATION":"⚠️ POSSIBLE OVERFITTING / OOS belum terkonfirmasi"}</div></div>
+ <div class="cd"><h2>MONTE CARLO (bootstrap 10.000 simulasi — bukan prediksi pasti)</h2>${mc?R("5% / 25%",P1(mc.p5)+" / "+P1(mc.p25))+R("Median",P1(mc.m))+R("75% / 95%",P1(mc.p75)+" / "+P1(mc.p95))+R("P(Loss) · Risk of Ruin (-50%)",P1(mc.loss)+" · "+P1(mc.ruin))+R("DD 5% terburuk",P1(mc.dd)):"<b class=y>INSUFFICIENT EVIDENCE</b> (trade &lt; 5)"}</div>
+ <div class="cd"><h2>ROBUSTNESS ${rb}/100 — ${RBL}</h2>${sc.map(a=>R(a[0],P1(a[1]),a[1]>0?"g":"r")).join("")}<div class="pl">Catatan: uji entry ±1 candle tidak disertakan.</div></div>
+ <div class="cd"><h2>REGIME</h2>${Object.keys(rg).map(a=>R(a,P1(rg[a]),rg[a]>0?"g":"r")).join("")}${rdep?'<p class="y">WARNING: REGIME-DEPENDENT STRATEGY</p>':""}</div>
+ <div class="cd"><h2>AI CONSENSUS (bobot dinormalisasi, agen tanpa data dikeluarkan)</h2>${R("Bullish / Neutral / Bearish",P1(bu)+" / "+P1(ne)+" / "+P1(be))}${R("Consensus",cons2)}
+ ${ag.map(a=>`<details><summary>${a.n} · <b class="${a.d===1?"g":a.d===-1?"r":a.d===0?"y":"m"}">${a.d===null?"DATA UNAVAILABLE":dn(a.d)}</b>${a.d===null?"":" · "+Math.round(a.c)+"%"}</summary><div class="pl">Bukti: ${a.ev.slice(0,5).join("; ")}<br>Pembatalan: ${a.inv}<br>Cap Waktu: ${ts}<br>Kualitas Data: ${a.dq}</div></details>`).join("")}</div>
+ <div class="cd"><h2>EDGE DETECTION</h2>${R("EDGE SCORE",ES+"/100 — "+ESL)}${R("Sample Size",BT.n<30?"⚠️ LOW SAMPLE ("+BT.n+")":BT.n+" trade")}${R("Overfitting",OV)}</div>`}
+tv("BTCUSDT");load();setInterval(load,60000);
+</script></body></html>
